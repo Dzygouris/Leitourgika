@@ -41,6 +41,8 @@ typedef struct process_control_block {
   PCB* parent;            /**< @brief Parent's pcb. */
   int exitval;            /**< @brief The exit value of the process */
 
+  uint countPTCBs;
+
   TCB* main_thread;       /**< @brief The main thread */
   Task main_task;         /**< @brief The main thread's function */
   int argl;               /**< @brief The main thread's argument length */
