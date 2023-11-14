@@ -3,7 +3,8 @@
 #include "kernel_cc.h"
 #include "kernel_proc.h"
 #include "kernel_streams.h"
-
+#include "tinyos.h"
+#include "kernel_sched.h"
 
 /* 
  The process table and related system calls:
@@ -116,9 +117,9 @@ void start_main_thread()
 {
   int exitval;
 
-  Task call =  CURPROC->main_task;
-  int argl = CURPROC->argl;
-  void* args = CURPROC->args;
+  Task call =  CURTHREAD->ptcb->task;
+  int argl = CURTHREAD -> ptcb->argl;
+  void* args = CURTHREAD->ptcb->args;
 
   exitval = call(argl,args);
   Exit(exitval);
