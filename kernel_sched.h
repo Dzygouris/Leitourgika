@@ -100,7 +100,7 @@ typedef struct process_thread_control_block{
 	int exited  [0,1];
 	int detached [0,1];
 	CondVar exit_cv;
-	int refcount;
+	int refcount;		
 
 	rlnode ptcb_list_node;
 
@@ -192,8 +192,22 @@ TCB* cur_thread();
 
   This is a pointer to the PCB of the owner process of the current thread, 
   i.e., the thread currently executing on this core.
+
 */
-#define CURPROC (cur_thread()->owner_pcb)
+/* 
+	The current core's CCB. This must only be used in a 
+	non-preemtpive context.
+ */
+#define CURCORE (cctx[cpu_core_id])
+
+/* 
+	The current thread. This is a pointer to the TCB of the thread 
+	currently executing on this core.
+
+	This must only be used in non-preemptive context.
+*/
+#define CURTHREAD (CURCORE.current_thread)
+#define CURPROC (cur_thread()->pcb)
 
 /**
   @brief A timeout constant, denoting no timeout for sleep.
