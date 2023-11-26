@@ -8,6 +8,39 @@
 
 
 
+void start_new_thread(){
+   
+  int exitval ;
+  
+  
+  Task call = CURTHREAD->ptcb->task;
+  int argl = CURTHREAD-> ptcb->argl;
+  void* args = CURTHREAD -> ptcb ->args;
+  
+
+  exitval = call(argl,args);
+  sys_ThreadExit(exitval);
+  
+}
+
+ PTCB* create_ptcb(Task task,int argl, void* args){
+
+
+    PTCB* ptcb = (PTCB*)xmalloc(sizeof(PTCB));
+    rlnode_init(&ptcb->ptcb_list_node,ptcb);
+    ptcb->task =task;
+    ptcb->argl = argl;
+    ptcb->refcount = 1;
+    ptcb->args = args;
+
+
+    ptcb->detached  = 0;
+    ptcb->exited = 0 ;
+    ptcb->exit_cv = COND_INIT;
+
+    return ptcb ;
+  } 
+
 
 
 
@@ -22,7 +55,7 @@ Tid_t sys_CreateThread(Task task, int argl, void* args){
       ptcb->tcb = tcb;
       tcb ->ptcb = ptcb;
       
-      rlist_push_back( &CURPROC ->ptcb_list ,& ptcb -> ptcb_list_node);
+      rlist_push_back( &CURPROC ->ptcb_list ,&ptcb -> ptcb_list_node);
       CURPROC -> thread_count++;
 
       wakeup(ptcb->tcb);
@@ -61,12 +94,13 @@ Tid_t sys_ThreadSelf()
   */
 int sys_ThreadJoin(Tid_t tid, int* exitval){
 
-  PTCB* ptcb = find_PTCB_withTID(tid)
-  if(ptcb==NULL)
+  PTCB* ptcb = find_PTCB_withTID(tid);
+  if(ptcb==NULL){
     return -1;
+  }
 
-  if (tid == (Tid_t)CURTHREAD || ptcb->detached==1 || ptcb->exited==1 || CURTHREAD->owner_pcb != ptcb->tcb->owner_pcb)
-      return -1;
+  if (tid == (Tid_t)CURTHREAD || ptcb->detached==1 || ptcb->exited==1 || CURTHREAD->owner_pcb != ptcb->tcb->owner_pcb){
+      return -1;}
 
     ptcb->refcount++;
 
@@ -97,9 +131,10 @@ int sys_ThreadJoin(Tid_t tid, int* exitval){
   */
 int sys_ThreadDetach(Tid_t tid){
   
-  PTCB* ptcb = find_PTCB_withTID(tid)
-  if(ptcb==NULL)
+  PTCB* ptcb = find_PTCB_withTID(tid);
+  if(ptcb==NULL){
     return -1;
+  }
 
   if(ptcb->exited==1)
     return -1;
@@ -115,99 +150,99 @@ int sys_ThreadDetach(Tid_t tid){
   @brief Terminate the current thread.
   */
 void sys_ThreadExit(int exitval){
-
-
-  CURTHREAD->ptcb->exited=1 ;
-  CURTHREAD->ptcb->exitval=exitval;
- 
-  kernel_broadcast(&CURTHREAD->ptcb->exit_cv);
-  // rlist_remove(&(CURTHREAD ->ptcb)-> ptcb_list_node);
-
-  CURPROC->thread_count--;
-   if (CURTHREAD->ptcb->refcount==0)
-   {
-     free(CURTHREAD->ptcb)
-   }
-   if (CURPROC->thread_count==1){
   
-     PCB* curproc = CURPROC;
+  CURTHREAD->ptcb->exited=1;
+  CURTHREAD->ptcb->exitval=exitval;
 
-     if (curproc->args){
-       free(curproc->args)
-       curproc->args =NULL;
-     }
+  kernel_broadcast(&CURTHREAD->ptcb->exit_cv);
 
-    
-     PCB* initpcb = get_pcb(1) ;
-     while(!is_rlist_empty(& curproc ->children_list)){
-       rlnode* child = rlist_pop_front(& curproc ->children_list);
-       child ->pcb->parent = initpcb;
+  rlist_remove(&(CURTHREAD->ptcb)-> ptcb_list_node);
+  CURPROC->thread_count--;
 
-     } 
+  if (CURTHREAD->ptcb->refcount==0)
+  {
+    free(CURTHREAD->ptcb);
+  }
+
+if (CURPROC->thread_count!=1)
+{
+  PCB *curproc = CURPROC;  /* cache for efficiency */
+  if(curproc->args) {
+    free(curproc->args);
+    curproc->args = NULL;
+  }
 
 
+  /* Clean up FIDT */
+  for(int i=0;i<MAX_FILEID;i++) {
+    if(curproc->FIDT[i] != NULL) {
+      FCB_decref(curproc->FIDT[i]);
+      curproc->FIDT[i] = NULL;
+    }
+}
 
-    if (!is_rlist_empty(& curproc->exited_list){
-      rlist_append(& initpcb->exited_list,& curproc->exited_list);
+   /* Reparent any children of the exiting process to the 
+       initial task */
+    PCB* initpcb = get_pcb(1);
+    while(!is_rlist_empty(& curproc->children_list)) {
+      rlnode* child = rlist_pop_front(& curproc->children_list);
+      child->pcb->parent = initpcb;
+      rlist_push_front(& initpcb->children_list, child);
+    }
+
+
+     /* Add exited children to the initial task's exited list 
+       and signal the initial task */
+    if(!is_rlist_empty(& curproc->exited_list)) {
+      rlist_append(& initpcb->exited_list, &curproc->exited_list);
       kernel_broadcast(& initpcb->child_exit);
     }
 
-    if (curproc->parent != NULL){
-      rlist_push_front(& curproc->parent->exited_list, &curproc->exited_node);
-      kernel_broadcast(& curproc->parent->child_exit);
 
-    }
+    /* Put me into my parent's exited list */
+    rlist_push_front(& curproc->parent->exited_list, &curproc->exited_node);
+    kernel_broadcast(& curproc->parent->child_exit);
 
-    curproc->main_thread = NULL;  
+      /* Disconnect my main_thread */
+      curproc->main_thread = NULL;
+  /* , store the exit status */
+  curproc->exitval = exitval;
 
 
-    curproc->state = ZOMBIE;
+  curproc->pstate = ZOMBIE;
+
+  /* 
+    Here, we must check that we are not the init task. 
+    If we are, we must wait until all child processes exit. 
+   */
+  
+
+  assert(is_rlist_empty(& curproc->children_list));
+  assert(is_rlist_empty(& curproc->exited_list));
+
 
   
-}
 
-   
+  
+  
 
-   kernel_sleep(EXITED, SCHED_USER) ;
+  
+  }
 
-   return;
+
+
+  /* Now, mark the process as exited. */
+  
+
+  /* Bye-bye cruel world */
+  kernel_sleep(EXITED, SCHED_USER);
+
+
+  return;
  
-}}
-   
-
-
-
-
-PTCB* create_ptcb(Task task,int argl, void* args){
-
-
-    PTCB* ptcb = (PTCB*)xmalloc(sizeof(PTCB));
-    rlnode_init(& ptcb->ptcb_list_node,ptcb);
-    ptcb->task =task;
-    ptcb ->argl = argl;
-    ptcb -> ref_count = 1;
-    ptcb -> args = args;
-
-
-    ptcb -> detached  = 0;
-    ptcb -> exited = 0 ;
-    ptcb -> exit_cv = COND_INIT;
-
-    return ptcb ;
-  } 
-
-
-void start_new_thread(){
-   
-  int exitval ;
-  TCB* curthread = cur_thread();
-  
-  Task call = curthread->ptcb->task;
-  int argl = curthread-> ptcb->argl;
-  void* args = curthread -> ptcb ->args;
-  
-
-  exitval = call(argl,args);
-  sys_ThreadExit(exitval);
-  
 }
+   
+
+
+
+
