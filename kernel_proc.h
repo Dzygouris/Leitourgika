@@ -41,7 +41,7 @@ typedef struct process_control_block {
   PCB* parent;            /**< @brief Parent's pcb. */
   int exitval;            /**< @brief The exit value of the process */
 
-  uint countPTCBs;
+  
 
   TCB* main_thread;       /**< @brief The main thread */
   Task main_task;         /**< @brief The main thread's function */
@@ -58,7 +58,7 @@ typedef struct process_control_block {
 
                              This condition variable is  broadcast each time a child
                              process terminates. It is used in the implementation of
-                             @c WaitChild() */
+                              @c WaitChild() */
 
   FCB* FIDT[MAX_FILEID];  /**< @brief The fileid table of the process */
 
