@@ -25,14 +25,14 @@
  *********************************************/
 
 /* Core control blocks */
-/*CCB cctx[MAX_CORES];
+CCB cctx[MAX_CORES];
 
 
 /* 
 	The current core's CCB. This must only be used in a 
 	non-preemtpive context.
  */
-// #define CURCORE (cctx[cpu_core_id])
+#define CURCORE (cctx[cpu_core_id])
 
 // /* 
 // 	The current thread. This is a pointer to the TCB of the thread 
@@ -176,6 +176,7 @@ TCB* spawn_thread(PCB* pcb, void (*func)())
 	tcb->rts = QUANTUM;
 	tcb->last_cause = SCHED_IDLE;
 	tcb->curr_cause = SCHED_IDLE;
+	tcb->priority=NUM_QUEUES/2;
 
 	/* Compute the stack segment address and size */
 	void* sp = ((void*)tcb) + THREAD_TCB_SIZE;
@@ -466,29 +467,22 @@ void yield(enum SCHED_CAUSE cause)
 
 
 	switch (cause) {
-	case SCHED_IDLE :
-		current->priority = NUM_QUEUES-1;
-		break;
-
 	case SCHED_QUANTUM :
 		if (current->priority>0)
 			current->priority--;
 		break;
-
 	case SCHED_IO :
-		if (current->priority<NUM_QUEUES-1){
-			current->priority++ ;
-		}
-		else{
-			current->priority = NUM_QUEUES;
-		}
+		current->priority=NUM_QUEUES-1;
 		break;
 	case SCHED_MUTEX:
 		if(current->curr_cause== current->last_cause){
 			if (current->priority>0){
 				current->priority--;
 			}
+
 			}
+	case SCHED_USER:
+		break;		
 
     default :
     	break ;
@@ -597,8 +591,9 @@ static void idle_thread()
   Initialize the scheduler queue
  */
 void initialize_scheduler()
-{
-	rlnode_init(&SCHED, NULL);
+{for(int i=0;i<NUM_QUEUES;i++){
+	rlnode_init(&SCHED[i], NULL);	
+}
 	rlnode_init(&TIMEOUT_LIST, NULL);
 }
 
