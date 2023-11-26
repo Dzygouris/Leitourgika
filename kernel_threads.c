@@ -78,15 +78,14 @@ Tid_t sys_CreateThread(Task task, int argl, void* args){
    }
 
 
-	
+  
 
 
 /**
   @brief Return the Tid of the current thread.
  */
-Tid_t sys_ThreadSelf()
-{
-	return (Tid_t) cur_thread()->ptcb;
+Tid_t sys_ThreadSelf(){
+  return (Tid_t) cur_thread()->ptcb;
 }
 
 /**
@@ -141,9 +140,9 @@ int sys_ThreadDetach(Tid_t tid){
   if (ptcb->detached==1)
     return -1;
 
-  ptcb->detached==1;
+  ptcb->detached=1;
   kernel_broadcast(&ptcb->exit_cv);
-  return 0;	
+  return 0; 
 }
 
 /**
@@ -242,7 +241,3 @@ if (CURPROC->thread_count!=1)
  
 }
    
-
-
-
-
