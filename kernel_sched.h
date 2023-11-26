@@ -91,18 +91,20 @@ enum SCHED_CAUSE {
 	SCHED_USER /**< @brief User-space code called yield */
 };
 typedef struct process_thread_control_block{
+	int refcount;	
 	TCB* tcb;
+	rlnode ptcb_list_node;
 	Task task;
 	
 	int  argl;
 	void* args;
 	int exitval;
-	int exited  [0,1];
-	int detached [0,1];
+	int exited  ;
+	int detached ;
 	CondVar exit_cv;
-	int refcount;		
+		
 
-	rlnode ptcb_list_node;
+
 
 } PTCB;
 /**
@@ -131,6 +133,8 @@ typedef struct thread_control_block {
 
 	enum SCHED_CAUSE curr_cause; /**< @brief The endcause for the current time-slice */
 	enum SCHED_CAUSE last_cause; /**< @brief The endcause for the last time-slice */
+
+	int priority;
 
 #ifndef NVALGRIND
 	unsigned valgrind_stack_id; /**< @brief Valgrind helper for stacks. 
@@ -207,7 +211,7 @@ TCB* cur_thread();
 	This must only be used in non-preemptive context.
 */
 #define CURTHREAD (CURCORE.current_thread)
-#define CURPROC (cur_thread()->pcb)
+#define CURPROC (CURTHREAD->owner_pcb)
 
 /**
   @brief A timeout constant, denoting no timeout for sleep.
