@@ -45,6 +45,9 @@ static inline void initialize_PCB(PCB* pcb)
   rlnode_init(& pcb->children_node, pcb);
   rlnode_init(& pcb->exited_node, pcb);
   pcb->child_exit = COND_INIT;
+
+  rlnode_init(& pcb->ptcb_list, NULL);
+  pcb->thread_count=0;
 }
 
 
@@ -182,7 +185,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
     PTCB* ptcb = (PTCB*)xmalloc(sizeof(PTCB));
     ptcb->task=newproc->main_task;
     ptcb->argl = newproc->argl;
-    ptcb->refcount=1;
+    ptcb->refcount=0;
     ptcb->args=newproc->args;
 
     ptcb->detached=0;
@@ -190,7 +193,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
     ptcb->exit_cv = COND_INIT ;
 
 
-    rlnode_init(& ptcb ->ptcb_list_node,ptcb);
+    rlnode_init(& ptcb->ptcb_list_node,ptcb);
 
    
 
@@ -201,7 +204,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
     ptcb->tcb = newproc->main_thread;
     newproc->main_thread->ptcb= ptcb;
 
-    rlist_push_back(& newproc->ptcb_list,&ptcb ->ptcb_list_node);
+    rlist_push_back(& newproc->ptcb_list,&ptcb->ptcb_list_node);
     newproc-> thread_count++;
     wakeup(ptcb->tcb);
   }
@@ -311,14 +314,22 @@ Pid_t sys_WaitChild(Pid_t cpid, int* status)
 
 void sys_Exit(int exitval)
 {
+  PCB *curproc = CURPROC;  /* cache for efficiency */
 
-  if (sys_GetPid()==1)
-  {
-    while(sys_WaitChild(NOPROC,NULL)!= NOPROC);
+  /* First, store the exit status */
+  curproc->exitval = exitval;
+
+  /* 
+    Here, we must check that we are not the init task. 
+    If we are, we must wait until all child processes exit. 
+   */
+  if(get_pid(curproc)==1) {
+
+    while(sys_WaitChild(NOPROC,NULL)!=NOPROC);
+
   }
-
-  CURPROC->exitval = exitval;
-  sys_ThreadExit(exitval);}
+  sys_ThreadExit(exitval);
+}
 
   // PCB *curproc = CURPROC;  /* cache for efficiency */
 
