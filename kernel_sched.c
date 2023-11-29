@@ -12,8 +12,10 @@
 #endif
   
 
-  #define NUM_QUEUES 3   //number of priority queues in our scheduler
-  #define NUM_OF_CYCLES 200
+  #define NUM_QUEUES 3  //number of priority queues in our scheduler
+  #define NUM_OF_CYCLES 500
+
+
  
  int counter_cycle ; 
 
@@ -426,7 +428,7 @@ void sleep_releasing(Thread_state state, Mutex* mx, enum SCHED_CAUSE cause,
 
 void boost_head(){
 	
-	Mutex_Lock(&sched_spinlock);
+	//Mutex_Lock(&sched_spinlock);
 	for (int j = 0; j < NUM_QUEUES-1; j++){
 		if (!is_rlist_empty(&SCHED[j]))
 		{
@@ -436,7 +438,7 @@ void boost_head(){
 		}
 		
 	}
-	Mutex_Unlock(&sched_spinlock);
+	//Mutex_Unlock(&sched_spinlock);
 }
 
 /* This function is the entry point to the scheduler's context switching */
@@ -479,16 +481,24 @@ void yield(enum SCHED_CAUSE cause)
 			if (current->priority>0){
 				current->priority--;
 			}
-
-			}
+		}
 	case SCHED_USER:
+	case SCHED_POLL:
+	case SCHED_PIPE:
+	case SCHED_IDLE:
+
 		break;		
 
-    default :
-    	break ;
-      }
-         
 
+   
+  }
+         
+if (counter_cycle == NUM_OF_CYCLES)
+	{
+		boost_head();
+		counter_cycle = 0;
+	}
+	counter_cycle++;
 	
 
 	/* Get next */
@@ -510,12 +520,7 @@ void yield(enum SCHED_CAUSE cause)
 	   may have passed. Start a new timeslice...
 	  */
 
-	if (counter_cycle == NUM_OF_CYCLES)
-	{
-		boost_head();
-		counter_cycle = 0;
-	}
-	counter_cycle++;
+	
 	gain(preempt);
 }
 
