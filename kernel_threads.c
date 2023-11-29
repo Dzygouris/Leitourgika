@@ -212,6 +212,15 @@ if (CURPROC->thread_count==0) {
       curproc->FIDT[i] = NULL;
     }
   }
+  while(! is_rlist_empty(&curproc->ptcb_list)){
+    rlnode* ptcb_exit = rlist_pop_front(&curproc->ptcb_list);
+    if(ptcb_exit)
+      free(ptcb_exit->ptcb);
+
+  }
+
+
+
 
   /* Disconnect my main_thread */
   curproc->main_thread = NULL;
